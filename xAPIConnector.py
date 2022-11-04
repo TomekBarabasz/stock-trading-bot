@@ -9,8 +9,11 @@ DEBUG = True
 
 #default connection properites
 DEFAULT_XAPI_ADDRESS        = 'xapi.xtb.com'
-DEFAULT_XAPI_PORT           = 5124
-DEFUALT_XAPI_STREAMING_PORT = 5125
+DEFAULT_XAPI_PORT_DEMO           = 5124
+DEFUALT_XAPI_STREAMING_PORT_DEMO = 5125
+
+DEFAULT_XAPI_PORT_REAL           = 5112
+DEFUALT_XAPI_STREAMING_PORT_REAL = 5113
 
 # wrapper name and version
 WRAPPER_NAME    = 'python'
@@ -150,7 +153,7 @@ class JsonSocket(object):
     
     
 class APIClient(JsonSocket):
-    def __init__(self, address=DEFAULT_XAPI_ADDRESS, port=DEFAULT_XAPI_PORT, encrypt=True, logger=DummyLogger()):
+    def __init__(self, address=DEFAULT_XAPI_ADDRESS, port=DEFAULT_XAPI_PORT_DEMO, encrypt=True, logger=DummyLogger()):
         super(APIClient, self).__init__(address, port, encrypt,logger)
         if(not self.connect()):
             raise Exception("Cannot connect to " + address + ":" + str(port) + " after " + str(API_MAX_CONN_TRIES) + " retries")
@@ -166,11 +169,11 @@ class APIClient(JsonSocket):
         return self.execute(baseCommand(commandName, arguments))
 
 class APIStreamClient(JsonSocket):
-    def __init__(self, address=DEFAULT_XAPI_ADDRESS, port=DEFUALT_XAPI_STREAMING_PORT, encrypt=True, ssId=None, 
+    def __init__(self, address=DEFAULT_XAPI_ADDRESS, port=DEFUALT_XAPI_STREAMING_PORT_DEMO, encrypt=True, ssId=None, 
                  tickFun=None, tradeFun=None, balanceFun=None, tradeStatusFun=None, profitFun=None, newsFun=None):
         super(APIStreamClient, self).__init__(address, port, encrypt, DummyLogger())
-        self._ssId = ssId
 
+        self._ssId = ssId
         self._tickFun = tickFun
         self._tradeFun = tradeFun
         self._balanceFun = balanceFun
@@ -208,6 +211,9 @@ class APIStreamClient(JsonSocket):
         self._t.join()
         self.close()
 
+    def run(self):
+        join(self._t)
+    
     def execute(self, dictionary):
         self._sendObj(dictionary)
 
