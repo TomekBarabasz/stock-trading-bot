@@ -3,6 +3,7 @@ from datetime import datetime,timedelta
 from pathlib import Path
 from xAPIConnector import APIClient,APIStreamClient,loginCommand, DEFAULT_XAPI_PORT_DEMO, DEFAULT_XAPI_PORT_REAL
 from time import sleep
+from utils import PeriodCodes
 
 #import logging
 #logger = logging.getLogger("jsonSocket")
@@ -13,15 +14,7 @@ from time import sleep
 #else:
 #    logger.setLevel(logging.CRITICAL)
 
-PeriodCodes = { 'M1':1,
-                'M5':5,
-                'M15':15,
-                'M30':30,
-                'H1':60,
-                'H4':240,
-                'D1':1440,
-                'W1':10080,
-                'MN1':43200 }
+
 
 def parse_timestamp(tm_str):
     def timestamp(date_):
@@ -75,6 +68,7 @@ def cmdGetCandles(args):
         start_prm = Args.start
     
     port = DEFAULT_XAPI_PORT_REAL if Args.real else DEFAULT_XAPI_PORT_DEMO
+
     client = APIClient(port=port)
     loginResponse = client.execute(loginCommand(userId=Args.uid, password=Args.password))
 
@@ -96,8 +90,7 @@ def cmdGetCandles(args):
                 json.dump(response['returnData'],of)
         else:
             print('error',response['errorDescr'])
-    client.disconnect()
-    
+    client.disconnect()   
 
 def getCandles(client, symbol, period, start, end):
     arguments= { 'info': {
@@ -170,10 +163,10 @@ def cmdGetAllSymbols(args):
 if __name__ == '__main__':
     Cmds = {
         'getcan'    : cmdGetCandles,
-        'getallsym' : cmdGetAllSymbols,
+        'getsym'    : cmdGetAllSymbols,
         'sc'        : cmdStreamCandles
     }
-    if len(sys.argv)<1 or sys.argv[1] not in Cmds:
-        print('valid commands are',Cmds.keys())
+    if len(sys.argv) < 2 or sys.argv[1] not in Cmds:
+        print('valid commands are :',' '.join(Cmds.keys()))
         exit(0)
     Cmds[sys.argv[1]](sys.argv[2:])
