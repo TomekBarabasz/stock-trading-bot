@@ -14,8 +14,6 @@ from utils import PeriodCodes
 #else:
 #    logger.setLevel(logging.CRITICAL)
 
-
-
 def parse_timestamp(tm_str):
     def timestamp(date_):
         dt = date_-datetime(1970,1,1)
@@ -63,7 +61,7 @@ def cmdGetCandles(args):
         elif Args.freq == 'M15' or Args.freq == 'M30':
             start_prm = '-10m'
         elif Args.freq == 'H1':
-            start_prm = '-24m'
+            start_prm = '-12m'
     else:
         start_prm = Args.start
     

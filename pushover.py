@@ -1,6 +1,7 @@
 import http.client, urllib
 from sys import argv
 from utils import loadNamespaceFromJson
+from notify import NotificationSink
 
 def send_notify(cred, message):
     conn = http.client.HTTPSConnection("api.pushover.net:443")
@@ -27,6 +28,17 @@ def send_file(filename):
         }
     )
     print(r.text)
+
+def PushoverNotifySink(NotificationSink):
+    def __init__(self, credentials):
+        self.credentials = credentials
+    def notify(self, source, message):
+        send_notify(self.credentials, message)
+
+def createPushoverSink(configuration_filename):
+    credentials = loadNamespaceFromJson(open(configuration_filename)).pushover
+    ps = PushoverNotifySink(credentials)
+    return ps
 
 def loadCredentials(argv):
     cred_filename = argv[2] if len(argv) > 2 else './data/credentials.json'

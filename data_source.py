@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 from time import sleep
@@ -11,26 +10,27 @@ class DataReceiver(ABC):
 
 class DataSource(ABC):
     @abstractmethod
-    def registerForSymbol(self, symbol : str, frequency : str, receiver : DataReceiver):
+    def registerForSymbol(self, symbol : str, receiver : DataReceiver):
+        pass
+    def unregisterForSymbol(self, symbol : str, receiver : DataReceiver):
         pass
     @abstractmethod
-    def start(self):
-        pass
-    @abstractmethod
-    def stop(self):
+    def run(self):
         pass
 
 class FileDataSource(DataSource):
-    def __init__(self,delay):
+    def __init__(self,delay,logger):
         self.receivers = []
         self.delay = delay
-    def registerForSymbol(self, symbol, frequency, receiver):
-        self.receivers.append( (receiver, symbol, datetime.now()) )    
+        self.logger = logger
+    def registerForSymbol(self, symbol, receiver):
+        self.receivers.append( (receiver, symbol, datetime.now()) )
+        self.logger.info(f"register for symbol {symbol}")
     @abstractmethod
     def get_next_tick(self):
         pass
 
-    def start(self):
+    def run(self):
         cnt = 0
         while True:
             try:
@@ -45,13 +45,13 @@ class FileDataSource(DataSource):
             if cnt > 10:
                 break
 
-    def stop(self):
-        pass
-
 class JsonDataSource(FileDataSource):
-    def __init__(self, filename, delay, start_timestamp):
-        super().__init__(delay)
-        from .utils import loadNamespaceFromJson
+    def __init__(self, filename, **kwargs):
+        delay = kwargs['delay']
+        start_timestamp = kwargs.get('start_timestamp',None)
+        logger = kwargs.get('logger')
+        super().__init__(delay,logger)
+        from utils import loadNamespaceFromJson
         self.source = loadNamespaceFromJson(open(filename)).rateInfos
         self.iter = iter(self.source)
         if start_timestamp is not None:
@@ -70,12 +70,14 @@ class CSVDataSource(FileDataSource):
     def __init__(self, filename, delay, start_timestamp):
        pass
     
-def createDataSource(name, **kwargs):
-    if name == 'file':
-        filename = Path(kwargs['filename'])
-        if filename.suffix == '.json':
-            return JsonDataSource(**kwargs)
-        elif filename.suffix == '.csv':
-            return CSVDataSource(**kwargs)
-    elif name == 'xtb':
-        return None
+def createDataSource(type, **kwargs):
+    match type:
+        case 'file':
+            filename = Path(kwargs['filename'])
+            match filename.suffix:
+                case '.json':
+                    return JsonDataSource(**kwargs)
+                case '.csv':
+                    return CSVDataSource(**kwargs)
+        case 'xtb-client':
+            return None
