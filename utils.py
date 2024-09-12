@@ -1,6 +1,5 @@
 import json
 from types import SimpleNamespace
-from datetime import datetime, timedelta
 
 def readJson(filename, logger):
     try:
@@ -37,10 +36,3 @@ PeriodCodes = { 'M1':1,
                 'D1':1440,
                 'W1':10080,
                 'MN1':43200 }
-
-def xtb_timestamp(date_):
-    dt = date_-datetime(1970,1,1)
-    return int(dt.total_seconds()*1000)
-
-def xtb_date(timestamp):
-    return datetime(1970,1,1) + timedelta(seconds = timestamp / 1000)

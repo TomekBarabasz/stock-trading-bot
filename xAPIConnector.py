@@ -51,7 +51,7 @@ class JsonSocket(object):
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         else:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.socket = ssl.wrap_socket(sock)
+            self.socket = ssl.create_default_context().wrap_socket(sock, server_hostname=address)
         self.conn = self.socket
         self._timeout = None
         self._address = address
