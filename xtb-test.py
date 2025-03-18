@@ -1,5 +1,5 @@
 import sys,argparse,json,re
-from datetime import datetime,timedelta
+from datetime import datetime,timedelta,UTC
 from pathlib import Path
 from xAPIConnector import APIClient,APIStreamClient,loginCommand, DEFAULT_XAPI_PORT_DEMO, DEFAULT_XAPI_PORT_REAL
 from time import sleep
@@ -14,14 +14,17 @@ from utils import PeriodCodes
 #else:
 #    logger.setLevel(logging.CRITICAL)
 
+def gettime():
+    return datetime.now(UTC)
+
 def parse_timestamp(tm_str):
     def timestamp(date_):
-        dt = date_-datetime(1970,1,1)
+        dt = date_-datetime(1970,1,1, tzinfo=UTC)
         return int(dt.total_seconds()*1000)
 
     if tm_str == 'now':
-        return timestamp(datetime.utcnow())
-    m = re.search('([-+])(\d+)([mdwhy])',tm_str)
+        return timestamp(gettime())
+    m = re.search(r'([-+])(\d+)([mdwhy])',tm_str)
     if m is not None:
         sign = m.groups()[0]
         n = int(m.groups()[1])
@@ -38,7 +41,7 @@ def parse_timestamp(tm_str):
             td = timedelta(weeks=n*52)
         else:
             raise ValueError
-        return timestamp(datetime.utcnow() - td if sign == '-' else datetime.utcnow() + td)
+        return timestamp(gettime() - td if sign == '-' else gettime() + td)
     else:
         return timestamp(datetime.fromisoformat(tm_str))
 
@@ -78,16 +81,30 @@ def cmdGetCandles(args):
     start = parse_timestamp(start_prm)
     end = parse_timestamp(Args.end) if Args.end is not None else None
     for sym in Args.symbols:
-        print('get symbol',sym, end=' ')
         symbol_name = sym if Args.crypto else sym + '_9'
-        response = getCandles(client, symbol_name , PeriodCodes[Args.freq], start, end)
-        if response['status'] == True:
-            print('done')
-            filename = Args.out / f'{sym}_{Args.freq}.json'
-            with (filename).open('w') as of:
-                json.dump(response['returnData'],of)
-        else:
-            print('error',response['errorDescr'])
+        retry = 1
+        while True:
+            print('get symbol',symbol_name, end=' ')
+            response = getCandles(client, symbol_name , PeriodCodes[Args.freq], start, end)
+            if response['status'] == True:
+                print('done')
+                filename = Args.out / f'{sym}_{Args.freq}.json'
+                with (filename).open('w') as of:
+                    json.dump(response['returnData'],of)
+                break
+            else:
+                error = response['errorDescr']
+                if error == f'Symbol {symbol_name} does not exist' and retry > 0:
+                    retry = retry - 1
+                    symbol_name = sym
+                    continue
+                elif error == 'Request too frequent.':
+                    sleep(1)
+                    print(error,'retry')
+                    continue
+                print('error',error)
+                break
+        sleep(1)
     client.disconnect()   
 
 def getCandles(client, symbol, period, start, end):
