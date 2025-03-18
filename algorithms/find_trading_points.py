@@ -1,8 +1,10 @@
 import numpy as np
-from .common import std_markers,std_print_to_console
+from .common import std_markers,std_print_to_console,generate_valid_intervals
 from datetime import datetime
+from .find_optimal_trading_improve_greedy import find_optimal_trading_points__improve_greedy
+from .find_optimal_trading_weighted_interval_scheduling import find_optimal_trading_points__wis
 
-def find_trading_points_0(df, ema_span=5, price_col='close', markers = std_markers):
+def generate_trading_points__ema_vs_raw(df, ema_span=5, price_col='close', markers = std_markers):
     """
     Vectorized function to find optimal buy/sell points using EMA.
     
@@ -46,7 +48,7 @@ def find_trading_points_0(df, ema_span=5, price_col='close', markers = std_marke
 
     return sorted(signals, key = lambda x : x[0])
 
-def find_trading_points_1(df, ema_span=5, price_col='close', markers = std_markers):
+def generate_trading_points__ema_diff(df, ema_span=5, price_col='close', markers = std_markers):
     df = df.copy()
 
     # Calculate EMA
@@ -61,22 +63,17 @@ def find_trading_points_1(df, ema_span=5, price_col='close', markers = std_marke
 
     return list(zip(zeros,types))
 
-def generate_trading_pairs_range(df, trading_points, tp_range, spread):
-    pass
+Trading_points_functions = {
+    'ema-vs-raw' : generate_trading_points__ema_vs_raw,
+    'ema-diff'   : generate_trading_points__ema_diff
+}
+def get_generate_trading_points_methods():
+    return list(Trading_points_functions.keys())
 
-def find_first(trading_points, start, end, type):
-    for i in range(start,end):
-        if trading_points[i][1] == type:
-            return i
-    return None
+def get_generate_trading_points_function(method):
+    return Trading_points_functions.get(method,None)
 
-def find_last(trading_points, start, end, type):
-    for i in range(end-1,start,-1):
-        if trading_points[i][1] == type:
-            return i
-    return None
-
-def find_best_trading_points(df, trading_points, initial_cash, spread, min_profit, price_column = 'close', markers = std_markers, verbose_fn = std_print_to_console):
+def find_optimal_trading_points__search(df, trading_points, initial_cash, spread, min_profit, price_column = 'close', markers = std_markers, verbose_fn = std_print_to_console):
     sm = markers['sell']
     bm = markers['buy']
     n_points = len(trading_points)
@@ -100,6 +97,7 @@ def find_best_trading_points(df, trading_points, initial_cash, spread, min_profi
                         sell_price = df.iloc[trading_points[si][0]][price_column]
                         shares =  np.floor(cash / buy_price)
                         rest = cash - shares * buy_price
+                        verbose_fn('\ttrying ({},{}) shares {} profit {}',(bi,si,shares,(sell_price - buy_price - spread) * shares))
                         if shares > 1:
                             profit = (sell_price - buy_price - spread) * shares
                             if profit > min_profit:
@@ -113,37 +111,18 @@ def find_best_trading_points(df, trading_points, initial_cash, spread, min_profi
             verbose_fn('\tend of sequence',())
             if len(BestTrading) > 0:
                 if total_profit > BestTrading[0][0]:
-                    BestTrading = [(total_profit, pairs, cash)]
+                    #BestTrading = [(total_profit, pairs, cash)]
+                    BestTrading = [(total_profit, pairs)]
                     verbose_fn('\treplace best trading',())
                 elif total_profit == BestTrading[0][0]:
-                    BestTrading.append( (total_profit, pairs, cash) )
+                    #BestTrading.append( (total_profit, pairs, cash) )
+                    BestTrading.append( (total_profit, pairs) )
                     verbose_fn('\tappend to best trading',())
             else:
-                BestTrading = [(total_profit, pairs, cash)]
+                #BestTrading = [(total_profit, pairs, cash)]
+                BestTrading = [(total_profit, pairs)]
                 verbose_fn('\tappend to best trading',())
     return BestTrading
-
-
-def generate_valid_intervals(df, trading_points, initial_cash, spread, min_profit, price_column = 'close', markers = std_markers, verbose_fn = std_print_to_console):
-    sm = markers['sell']
-    bm = markers['buy']
-    n_points = len(trading_points)
-    cash = initial_cash
-    valid_intervals = []
-    for bi in range(n_points):
-        if trading_points[bi][1] == bm:
-            for si in range(bi+1,n_points):
-                if trading_points[si][1] == sm:
-                    buy_price  = df.iloc[trading_points[bi][0]][price_column]
-                    sell_price = df.iloc[trading_points[si][0]][price_column]
-                    shares =  np.floor(cash / buy_price)
-                    if shares > 1:
-                        profit = (sell_price - buy_price - spread) * shares
-                        if profit > min_profit:
-                            valid_intervals.append( (bi,si, profit) )
-    return valid_intervals
-
-
 
 def solve_interval_scheduling_ILP(intervals, solver=None):
     from pulp import LpProblem, LpMaximize, LpVariable, LpBinary, lpSum, PULP_CBC_CMD
@@ -175,7 +154,7 @@ def solve_interval_scheduling_ILP(intervals, solver=None):
     # 5) Solve the problem
     if solver is None:
         # Default solver is CBC in PuLP. You can pass any other solver you have installed.
-        solver = PULP_CBC_CMD(msg=1,threads=16)  # msg=0 => silence solver output
+        solver = PULP_CBC_CMD(msg=0,threads=12)  # msg=0 => silence solver output
 
     print('starting solve')
     prob.solve(solver)
@@ -188,3 +167,59 @@ def solve_interval_scheduling_ILP(intervals, solver=None):
             chosen_intervals.append(intervals[i])
 
     return max_profit, chosen_intervals
+
+def find_optimal_trading_points__ILP(df, trading_points, initial_cash, spread, min_profit, price_column = 'close', markers = std_markers, verbose_fn = std_print_to_console):
+    intervals = generate_valid_intervals(df, trading_points, initial_cash, spread, min_profit, price_column, markers)
+    verbose_fn('created {} intervals', (len(intervals),))
+    max_profit, chosen_intervals = solve_interval_scheduling_ILP(intervals)
+    return [(max_profit, chosen_intervals)]
+
+def find_optimal_trading_points__local_search(df, trading_points, initial_cash, spread, min_profit, price_column = 'close', markers = std_markers, verbose_fn = std_print_to_console):
+    pass
+
+def find_optimal_trading_points__greedy(df, trading_points, initial_cash, spread, min_profit, price_column = 'close', markers = std_markers, verbose_fn = std_print_to_console):
+    sm = markers['sell']
+    bm = markers['buy']
+    n_points = len(trading_points)
+    cash = initial_cash
+    total_profit = 0
+    trading_pairs = []
+    bi = 0
+    while bi < n_points:
+        if trading_points[bi][1] == bm:
+            found_si = False
+            for si in range(bi+1,n_points):
+                if trading_points[si][1] == sm:
+                    buy_price  = df.iloc[trading_points[bi][0]][price_column]
+                    sell_price = df.iloc[trading_points[si][0]][price_column]
+                    shares =  np.floor(cash / buy_price)
+                    rest = cash - shares * buy_price
+                    #verbose_fn('\ttrying ({},{}) shares {} profit {}',(bi,si,shares,(sell_price - buy_price - spread) * shares))
+                    if shares > 1:
+                        profit = (sell_price - buy_price - spread) * shares
+                        if profit > min_profit:
+                            verbose_fn('\texecuting ({},{}) shares {} profit {:.1f}',(bi,si,shares,profit))
+                            total_profit += profit
+                            cash = rest + shares * (sell_price-spread)
+                            trading_pairs.append( (bi,si,profit) )
+                            found_si = True
+                            break
+            bi = bi + 1 if not found_si else si + 1
+        else:
+            bi = bi + 1                
+    return [(total_profit, trading_pairs)]
+
+Optimal_Trading_points_functions = {
+    'search' : find_optimal_trading_points__search,
+    'ilp'    : find_optimal_trading_points__ILP,
+    'local-search' : find_optimal_trading_points__local_search,
+    'greedy' : find_optimal_trading_points__greedy,
+    'improve-greedy' : find_optimal_trading_points__improve_greedy,
+    'wis' : find_optimal_trading_points__wis
+}
+
+def get_optimal_trading_points_methods():
+    return list(Optimal_Trading_points_functions.keys())
+
+def get_optimal_trading_points_function(method):
+    return Optimal_Trading_points_functions.get(method,None)

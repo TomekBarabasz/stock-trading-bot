@@ -62,7 +62,9 @@ def execute_trading_points(df, trading_points, initial_cash,  spread, min_profit
         
     return trades, total_profit, cash
 
-def simulate_trading_all_in_one(df, ema_span=10, initial_cash=1000.0, spread=0.02, min_profit=0.50, price_col='close'):
+# NOTE: this is wrong : stupid ChatGPT o1 made it wrong 
+# thading intervals overlap - neeed to fix or
+def _wrong_simulate_trading_all_in_one(df, ema_span=10, initial_cash=1000.0, spread=0.02, min_profit=0.50, price_col='close'):
     """
     Vectorized function to find optimal buy/sell points using EMA, with initial cash, transaction costs, and min profit.
     
