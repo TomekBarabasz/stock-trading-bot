@@ -43,8 +43,10 @@ def generate_trading_points__ema_vs_raw(df, ema_span=5, price_col='close', marke
     )
     
     # Get buy and sell indices
-    signals  = [(i, markers[ 'buy']) for i in df.index[ buy_signals]]
-    signals += [(i, markers['sell']) for i in df.index[sell_signals]]
+    #signals  = [(i, markers[ 'buy'], df.loc[i,price_col]) for i in df.index[ buy_signals]]
+    #signals += [(i, markers['sell'], df.loc[i,price_col]) for i in df.index[sell_signals]]
+    signals  = [(idx,markers[ 'buy'], val) for idx,val in df.loc[buy_signals,price_col].items()]
+    signals += [(idx,markers[ 'sell'],val) for idx,val in df.loc[sell_signals,price_col].items()]
 
     return sorted(signals, key = lambda x : x[0])
 
@@ -60,8 +62,8 @@ def generate_trading_points__ema_diff(df, ema_span=5, price_col='close', markers
     sm = markers['sell']
     bm = markers['buy']
     types = [sm if diff[z] > 0 else bm for z in zeros]
-
-    return list(zip(zeros,types))
+    prices = df[zeros,price_col].tolist()
+    return list(zip(zeros,types,prices))
 
 Trading_points_functions = {
     'ema-vs-raw' : generate_trading_points__ema_vs_raw,

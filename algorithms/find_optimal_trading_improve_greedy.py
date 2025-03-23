@@ -3,7 +3,6 @@ from .common import std_markers,std_print_to_console,generate_valid_intervals
 from datetime import datetime
 
 def build_greedy_solution(intervals, n_points):
-    
     trading_pairs = []
     total_profit = 0
     current_start = 0

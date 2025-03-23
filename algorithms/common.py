@@ -12,12 +12,14 @@ def generate_valid_intervals(df, trading_points, initial_cash, spread, min_profi
         if trading_points[bi][1] == bm:
             for si in range(bi+1,n_points):
                 if trading_points[si][1] == sm:
-                    buy_price  = df.iloc[trading_points[bi][0]][price_column]
-                    sell_price = df.iloc[trading_points[si][0]][price_column]
+                    buy_index = trading_points[bi][0]
+                    sell_index= trading_points[si][0]
+                    buy_price  = df.iloc[buy_index][price_column]
+                    sell_price = df.iloc[sell_index][price_column]
                     shares =  np.floor(cash / buy_price)
-                    if shares > 1:
+                    if shares >= 1:
                         profit = (sell_price - buy_price - spread) * shares
-                        if profit > min_profit:
-                            valid_intervals.append( (bi,si, profit) )
+                        if profit >= min_profit:
+                            valid_intervals.append( (buy_index,sell_index,profit) )
 
     return valid_intervals
